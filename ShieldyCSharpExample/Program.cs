@@ -16,6 +16,8 @@ namespace ShieldyCSharpExample
             private const string DllFilePathUpdate = "lib/native.update";
             public static string AppSalt;
             public static bool Initialized;
+            public static bool DebugMode = true;
+
 
             public static string Xor(string val, string key)
             {
@@ -220,11 +222,11 @@ namespace ShieldyCSharpExample
 
             [DllImport(Utils.DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.I1)]
-            public static extern bool SC_GetVariable(string secretName, out IntPtr buf, out int size);
+            public static extern bool SC_GetVariable(string variableName, out IntPtr buf, out int size);
 
             [DllImport(Utils.DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.I1)]
-            public static extern bool SC_GetUserProperty(string secret, out IntPtr buf, out int size);
+            public static extern bool SC_GetUserProperty(string fileName, out IntPtr buf, out int size);
 
             [DllImport(Utils.DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.I1)]
@@ -248,6 +250,10 @@ namespace ShieldyCSharpExample
 
             [DllImport(Utils.DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             public static extern int SC_GetLastError();
+
+            [DllImport(Utils.DllFilePath, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.I1)]
+            public static extern bool SC_FreeMemory(out IntPtr buf);
         }
 
         public static bool Initialize(string appGuid, string version, string appSalt)
@@ -288,13 +294,15 @@ namespace ShieldyCSharpExample
                 Marshal.Copy(buf, data, 0, size);
                 var resultVariable = Encoding.UTF8.GetString(data);
 
-                Marshal.FreeHGlobal(buf);
+                if (!Bindings.SC_FreeMemory(out buf) && Utils.DebugMode)
+                {
+                    Console.WriteLine("Failed to free memory in GetVariable function for variable: " + name);
+                }
 
                 return Utils.Xor(resultVariable, Utils.AppSalt);
-                ;
             }
 
-            Console.WriteLine("Failed to get variable: " + name);
+            if (Utils.DebugMode) Console.WriteLine("Failed to get variable: " + name);
             return "";
         }
 
@@ -309,13 +317,16 @@ namespace ShieldyCSharpExample
                 Marshal.Copy(buf, data, 0, size);
                 var resultVariable = Encoding.UTF8.GetString(data);
 
-                Marshal.FreeHGlobal(buf);
+                if (!Bindings.SC_FreeMemory(out buf) && Utils.DebugMode)
+                {
+                    Console.WriteLine("Failed to free memory in GetUserProperty function for user property: " +
+                                      propertyName);
+                }
 
                 return Utils.Xor(resultVariable, Utils.AppSalt);
-                ;
             }
 
-            Console.WriteLine("Failed to get user property: " + propertyName);
+            if (Utils.DebugMode) Console.WriteLine("Failed to get user property: " + propertyName);
             return "";
         }
 
@@ -330,12 +341,16 @@ namespace ShieldyCSharpExample
                 Marshal.Copy(buf, data, 0, size);
                 var resultVariable = Encoding.UTF8.GetString(data);
 
-                Marshal.FreeHGlobal(buf);
+                if (!Bindings.SC_FreeMemory(out buf) && Utils.DebugMode)
+                {
+                    Console.WriteLine("Failed to free memory in DeobfuscateString function for str: " + base64 +
+                                      " and rounds: " + rounds);
+                }
 
                 return Utils.Xor(resultVariable, Utils.AppSalt);
             }
 
-            Console.WriteLine("Failed to deobfuscate string: " + base64);
+            if (Utils.DebugMode) Console.WriteLine("Failed to deobfuscate string: " + base64);
             return "";
         }
 
@@ -349,12 +364,16 @@ namespace ShieldyCSharpExample
                 byte[] data = new byte[size];
                 Marshal.Copy(buf, data, 0, size);
 
-                Marshal.FreeHGlobal(buf);
+                if (!Bindings.SC_FreeMemory(out buf) && Utils.DebugMode)
+                {
+                    Console.WriteLine("Failed to free memory in DownloadFile function for file name: " + name);
+                }
+
 
                 return Utils.Xor(data.ToList(), Utils.AppSalt);
             }
 
-            Console.WriteLine("Failed to download file: " + name);
+            if (Utils.DebugMode) Console.WriteLine("Failed to download file: " + name);
             return null;
         }
     }
@@ -518,9 +537,9 @@ namespace ShieldyCSharpExample
 
             Console.WriteLine(ShieldyApi.GetUserProperty("hwid"));
 
-            /*var file = ShieldyApi.DownloadFile("ScoopyNG.zip");
+            var file = ShieldyApi.DownloadFile("ScoopyNG.zip");
             Console.WriteLine("File size: " + file.Count);
-            File.WriteAllBytes("ScoopyNG.zip", file.ToArray());*/
+            File.WriteAllBytes("ScoopyNG.zip", file.ToArray());
         }
     }
 }
