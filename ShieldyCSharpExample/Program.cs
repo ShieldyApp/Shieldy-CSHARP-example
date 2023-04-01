@@ -140,29 +140,32 @@ namespace ShieldyCSharpExample
 
             Console.WriteLine("Please wait, we are checking your account...");
 
+            var shieldyApi = new ShieldyApi();
+
             //initialize
-            if (!ShieldyApi.Initialize(licenseKey, version, salt))
+            if (!shieldyApi.Initialize(licenseKey, version, salt))
             {
-                Console.WriteLine("Failed to initialize, error: " + ShieldyApi.GetLastError());
+                Console.WriteLine("Failed to initialize, error: " + shieldyApi.GetLastError());
                 Environment.Exit(0);
             }
 
             //try to login with credentials from file
             var credentials = new Credentials(mode);
 
-            if (!ShieldyApi.Login(credentials.GetUsername(), credentials.GetPassword()))
+            if (!shieldyApi.Login(credentials.GetUsername(), credentials.GetPassword()))
             {
-                Console.WriteLine("Failed to login, error: " + ShieldyApi.GetLastError());
+                Console.WriteLine("Failed to login, error: " + shieldyApi.GetLastError());
                 return;
             }
 
-            Console.WriteLine("Welcome " + ShieldyApi.GetUserProperty("username") + "!");
-            Console.WriteLine(ShieldyApi.GetVariable("PerApp"));
-            Console.WriteLine(ShieldyApi.DeobfuscateString("qeOIDvtmi0Qd71WRFHUlMg==", 10));
+            Console.WriteLine("Welcome " + shieldyApi.Data.Username + "!");
+            Console.WriteLine(shieldyApi.GetVariable("PerApp"));
+            Console.WriteLine(shieldyApi.DeobfuscateString("qeOIDvtmi0Qd71WRFHUlMg==", 10));
 
-            Console.WriteLine(ShieldyApi.GetUserProperty("hwid"));
+            Console.WriteLine(shieldyApi.Data.Hwid);
+            Console.WriteLine("Files: " + shieldyApi.Data.Files);
 
-            var file = ShieldyApi.DownloadFile("ScoopyNG.zip");
+            var file = shieldyApi.DownloadFile("ScoopyNG.zip");
             Console.WriteLine("File size: " + file.Count);
             File.WriteAllBytes("ScoopyNG.zip", file.ToArray());
         }
