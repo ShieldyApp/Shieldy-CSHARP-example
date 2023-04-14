@@ -5,11 +5,25 @@ namespace ShieldyCSharpExample
 {
     internal static class Program
     {
+        /**
+         * Credentials handler
+         * 
+         * This class handles the credentials from the user.
+         * It will try to read the credentials from the file credentials.txt.
+         * If the file does not exist, it will ask the user to enter the credentials.
+         * After fetching the credentials, they will be used to login via the Shieldy API.
+         *
+         * Support two modes:
+         * - UsernamePassword - use username and password to login
+         * - LicenseKey - use license key to login
+         */
         private class Credentials
         {
+            private const string Filename = "credentials.txt";
             private readonly string _licenseKey;
             private readonly string _username;
             private readonly string _password;
+            private readonly CredentialsMode _credentialsMode;
 
             public enum CredentialsMode
             {
@@ -30,23 +44,23 @@ namespace ShieldyCSharpExample
 
             private bool SaveCredentials()
             {
-                //save to file credentials.txt
+                //save credentials to file
                 try
                 {
-                    //create credentials file
-                    if (File.Exists("credentials.txt"))
+                    //create credentials file if it does not exist
+                    if (!File.Exists(Filename))
                     {
-                        File.Delete("credentials.txt");
+                        File.Delete(Filename);
                     }
 
-                    //save credentials to file credentials.txt
+                    //save credentials depending on the mode
                     if (this._licenseKey != null)
                     {
-                        File.WriteAllText("credentials.txt", this._licenseKey);
+                        File.WriteAllText(Filename, this._licenseKey);
                     }
                     else
                     {
-                        File.WriteAllText("credentials.txt", this._username + Environment.NewLine + this._password);
+                        File.WriteAllText(Filename, this._username + Environment.NewLine + this._password);
                     }
 
                     return true;
@@ -57,39 +71,17 @@ namespace ShieldyCSharpExample
                     return false;
                 }
             }
-            
-            public Credentials(CredentialsMode mode)
+
+            public Credentials(CredentialsMode credentialsMode)
             {
-                //read credentials from file
-                //get credentials from file credentials.txt
-                if (File.Exists("credentials.txt"))
+                _credentialsMode = credentialsMode;
+
+                //credentials file does not exist, ask user to enter credentials
+                if (!File.Exists(Filename))
                 {
-                    var lines = File.ReadAllLines("credentials.txt");
-                    switch (lines.Length)
-                    {
-                        case 2:
-                            //valid credentials (username and password)
-                            this._username = lines[0];
-                            this._password = lines[1];
-                            Console.WriteLine(
-                                "Found credentials in file credentials.txt, logging in using username and password...");
-                            break;
-                        case 1:
-                            //valid credentials (license key)
-                            this._licenseKey = lines[0];
-                            Console.WriteLine(
-                                "Found credentials in file credentials.txt, logging in using license key...");
-                            break;
-                        default:
-                            //invalid credentials, delete file
-                            File.Delete("credentials.txt");
-                            throw new Exception("Invalid credentials format in file credentials.txt");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("No credentials found in file credentials.txt, please enter your credentials:");
-                    switch (mode)
+                    Console.WriteLine("No credentials found in file " + Credentials.Filename +
+                                      ", please enter your credentials:");
+                    switch (credentialsMode)
                     {
                         case CredentialsMode.UsernamePassword:
                             Console.WriteLine("Please enter your username:");
@@ -104,8 +96,31 @@ namespace ShieldyCSharpExample
                             SaveCredentials();
                             break;
                         default:
-                            throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
+                            throw new ArgumentOutOfRangeException(nameof(credentialsMode), credentialsMode, null);
                     }
+                }
+
+                //read credentials from file
+                var lines = File.ReadAllLines(Filename);
+                switch (lines.Length)
+                {
+                    case 2:
+                        //valid credentials (username and password)
+                        this._username = lines[0];
+                        this._password = lines[1];
+                        Console.WriteLine(
+                            "Found credentials in file credentials.txt, logging in using username and password...");
+                        break;
+                    case 1:
+                        //valid credentials (license key)
+                        this._licenseKey = lines[0];
+                        Console.WriteLine(
+                            "Found credentials in file credentials.txt, logging in using license key...");
+                        break;
+                    default:
+                        //invalid credentials, delete file
+                        File.Delete(Filename);
+                        throw new Exception("Invalid credentials format in file credentials.txt");
                 }
             }
 
@@ -123,6 +138,19 @@ namespace ShieldyCSharpExample
             {
                 return this._licenseKey;
             }
+
+            public bool PerformLogin(ShieldyApi api)
+            {
+                switch (_credentialsMode)
+                {
+                    case CredentialsMode.UsernamePassword:
+                        return api.Login(_username, _password);
+                    case CredentialsMode.LicenseKey:
+                        return api.Login(_licenseKey);
+                    default:
+                        return false;
+                }
+            }
         }
 
         public static void Main(string[] args)
@@ -132,6 +160,10 @@ namespace ShieldyCSharpExample
             //UsernamePassword - use username and password to login
             const Credentials.CredentialsMode mode = Credentials.CredentialsMode.UsernamePassword;
 
+            //initialize api and credentials handler
+            var shieldyApi = new ShieldyApi();
+            var credentialsHandler = new Credentials(mode);
+
             //define license key, version and salt
             //you can get your license key from https://dashboard.shieldy.app
             const string licenseKey = "76934b5e-2191-47e2-88a2-a05000a3bbf9";
@@ -140,21 +172,17 @@ namespace ShieldyCSharpExample
 
             Console.WriteLine("Please wait, we are checking your account...");
 
-            var shieldyApi = new ShieldyApi();
-
-            //initialize
+            //initialize api, required to be called before any other api function
             if (!shieldyApi.Initialize(licenseKey, version, salt))
             {
-                Console.WriteLine("Failed to initialize, error: " + shieldyApi.GetLastError());
+                Console.WriteLine("Failed to initialize, error: " + ShieldyApi.GetLastError());
                 Environment.Exit(0);
             }
 
-            //try to login with credentials from file
-            var credentials = new Credentials(mode);
-
-            if (!shieldyApi.Login(credentials.GetUsername(), credentials.GetPassword()))
+            //try to login with credentials from file, if failed, ask for input and save to file
+            if (!credentialsHandler.PerformLogin(shieldyApi))
             {
-                Console.WriteLine("Failed to login, error: " + shieldyApi.GetLastError());
+                Console.WriteLine("Failed to login, error: " + ShieldyApi.GetLastError());
                 return;
             }
 
@@ -168,6 +196,8 @@ namespace ShieldyCSharpExample
             var file = shieldyApi.DownloadFile("ScoopyNG.zip");
             Console.WriteLine("File size: " + file.Count);
             File.WriteAllBytes("ScoopyNG.zip", file.ToArray());
+
+            Console.ReadKey();
         }
     }
 }
