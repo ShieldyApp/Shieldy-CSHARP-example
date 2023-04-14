@@ -164,16 +164,16 @@ namespace ShieldyCSharpExample
             var shieldyApi = new ShieldyApi();
             var credentialsHandler = new Credentials(mode);
 
-            //define license key, version and salt
-            //you can get your license key from https://dashboard.shieldy.app
-            const string licenseKey = "76934b5e-2191-47e2-88a2-a05000a3bbf9";
+            //define appGuid, appVersion and appSalt
+            //you can get your app details from https://dashboard.shieldy.app
+            const string appGuid = "76934b5e-2191-47e2-88a2-a05000a3bbf9";
             const string version = "1.0";
-            const string salt = "6166edbd36aec11af66e722e40baa2c7645387f28efe4e60abcc454723f6439e";
+            const string appSalt = "6166edbd36aec11af66e722e40baa2c7645387f28efe4e60abcc454723f6439e";
 
             Console.WriteLine("Please wait, we are checking your account...");
 
             //initialize api, required to be called before any other api function
-            if (!shieldyApi.Initialize(licenseKey, version, salt))
+            if (!shieldyApi.Initialize(appGuid, version, appSalt))
             {
                 Console.WriteLine("Failed to initialize, error: " + ShieldyApi.GetLastError());
                 Environment.Exit(0);
