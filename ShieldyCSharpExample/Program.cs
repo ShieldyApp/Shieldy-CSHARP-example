@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Text;
 
 namespace ShieldyCSharpExample
 {
@@ -79,7 +80,7 @@ namespace ShieldyCSharpExample
                 //credentials file does not exist, ask user to enter credentials
                 if (!File.Exists(Filename))
                 {
-                    Console.WriteLine("No credentials found in file " + Credentials.Filename +
+                    Console.WriteLine("No credentials found in file " + Filename +
                                       ", please enter your credentials:");
                     switch (credentialsMode)
                     {
