@@ -154,6 +154,39 @@ namespace ShieldyCSharpExample
             }
         }
 
+        private static void CallbackHandler(int code, string message)
+        {
+            switch (code)
+            {
+                case 5001:
+                {
+                    Console.WriteLine("Update available, it will be downloaded and installed now.");
+                    break;
+                }
+                case 5002:
+                {
+                    Console.WriteLine("Update failed, error: " + message);
+                    break;
+                }
+                case 5003:
+                {
+                    Console.WriteLine("Update installed successfully. Please restart the application.");
+                    break;
+                }
+                default:
+                {
+                    Console.WriteLine(message);
+                    break;
+                }
+            }
+        }
+        
+        private static void ProgressBarHandler(int progress)
+        {
+            Console.WriteLine("Download progress: " + progress + "%");
+        }
+
+
         public static void Main(string[] args)
         {
             //define credentials mode
@@ -174,9 +207,9 @@ namespace ShieldyCSharpExample
             Console.WriteLine("Please wait, we are checking your account...");
 
             //initialize api, required to be called before any other api function
-            if (!shieldyApi.Initialize(appGuid, version, appSalt))
+            if (!shieldyApi.Initialize(appGuid, version, appSalt, CallbackHandler, null))
             {
-                Console.WriteLine("Failed to initialize, error: " + ShieldyApi.GetLastError());
+                // Console.WriteLine("Failed to initialize, error: " + ShieldyApi.GetLastError());
                 Environment.Exit(0);
             }
 
@@ -195,10 +228,13 @@ namespace ShieldyCSharpExample
             Console.WriteLine("Files: " + shieldyApi.Data.Files);
 
             var file = shieldyApi.DownloadFile("ScoopyNG.zip");
-            Console.WriteLine("File size: " + file.Count);
-            File.WriteAllBytes("ScoopyNG.zip", file.ToArray());
-
-            Console.ReadKey();
+            if (file != null)
+            {
+                Console.WriteLine("File size: " + file.Count);
+                File.WriteAllBytes("ScoopyNG.zip", file.ToArray());
+            }
+            
+            Console.WriteLine("Exit normally.");
         }
     }
 }

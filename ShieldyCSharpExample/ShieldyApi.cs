@@ -31,8 +31,14 @@ namespace ShieldyCSharpExample
 
         private const string DllFilePathUpdate = "lib/native.update";
 
+        //delegate for callback function
+        public delegate void MessageCallbackDelegate(int code, string message);
+
+        public delegate void DownloadCallbackDelegate(float progress);
+
         private string _appSalt;
         private bool _initialized;
+        private static string _currDlFile;
         private const bool DebugMode = true;
         public UserData Data;
 
@@ -72,11 +78,12 @@ namespace ShieldyCSharpExample
 
             public static void PerformUpdate()
             {
-                if (!File.Exists(DllFilePathUpdate)) return;
+                //FIXME
+                /*if (!File.Exists(DllFilePathUpdate)) return;
 
                 //update file exists, delete old file and replace with new one
                 File.Delete(DllFilePath);
-                File.Move(DllFilePathUpdate, DllFilePath);
+                File.Move(DllFilePathUpdate, DllFilePath);*/
             }
 
             private static bool CompareBytearrays(ICollection<byte> a, IList<byte> b)
@@ -242,9 +249,30 @@ namespace ShieldyCSharpExample
 
         private static class Bindings
         {
+            //TODO
+            public static void DefaultMessageCallbackFunction(int code, string message)
+            {
+                Console.WriteLine("[INFO] code: " + code + " " + message);
+            }
+
+            public static void DefaultDownloadProgressFunction(float progress)
+            {
+                if (float.IsNaN(progress) || float.IsInfinity(progress)) return;
+                if (_currDlFile == "") return;
+                if (progress == 100)
+                {
+                    Console.Write("\r[INFO] File '" + _currDlFile + "' downloaded.             \n");
+                    _currDlFile = "";
+                    return;
+                }
+                Console.Write("\r[INFO] Downloading file '" + _currDlFile + "' -> " + progress + "%");
+            }
+
             [DllImport(DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.I1)]
-            public static extern bool SC_Initialize(string licenseKey, string appSecret);
+            public static extern bool SC_Initialize(string licenseKey, string appSecret,
+                [MarshalAs(UnmanagedType.FunctionPtr)] MessageCallbackDelegate msgCallback,
+                [MarshalAs(UnmanagedType.FunctionPtr)] DownloadCallbackDelegate downloadProgressCallback);
 
             [DllImport(DllFilePath, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.I1)]
@@ -364,7 +392,7 @@ namespace ShieldyCSharpExample
                 c = (byte)~c;
                 encryptedBytes[m] = c;
             }
-            
+
             //get all bytes except last one
             var encryptedBytesWithoutLast = new byte[encryptedBytes.Length - 1];
             for (var i = 0; i < encryptedBytesWithoutLast.Length; i++)
@@ -374,7 +402,6 @@ namespace ShieldyCSharpExample
 
             return Encoding.UTF8.GetString(encryptedBytesWithoutLast);
         }
-
 
         private static bool VerifyLibrary()
         {
@@ -404,19 +431,32 @@ namespace ShieldyCSharpExample
 
             //verify
             if (rsaCryptoServiceProvider.VerifyData(nativeSha256Hash, CryptoConfig.MapNameToOID("SHA256"), last256))
+            {
                 return true;
+            }
 
             if (DebugMode) Console.WriteLine("Verification of dll failed.");
             Environment.Exit(0);
             return false;
         }
 
-        public bool Initialize(string appGuid, string version, string appSalt)
+        public bool Initialize(string appGuid, string version, string appSalt, MessageCallbackDelegate callbackDelegate, DownloadCallbackDelegate downloadCallbackDelegate)
         {
             _appSalt = appSalt;
             if (!VerifyLibrary()) return false;
 
-            _initialized = Bindings.SC_Initialize(appGuid, version);
+            if (callbackDelegate == null)
+            {
+                //use default callback delegate
+                callbackDelegate = Bindings.DefaultMessageCallbackFunction;
+            }
+            if (downloadCallbackDelegate == null)
+            {
+                //use default download callback delegate
+                downloadCallbackDelegate = Bindings.DefaultDownloadProgressFunction;
+            }
+
+            _initialized = Bindings.SC_Initialize(appGuid, version, callbackDelegate, downloadCallbackDelegate);
             return _initialized;
         }
 
@@ -581,6 +621,7 @@ namespace ShieldyCSharpExample
 
         public List<byte> DownloadFile(string name)
         {
+            _currDlFile = name;
             if (!_initialized)
             {
                 if (DebugMode) Console.WriteLine("You must initialize the library before logging in.");
@@ -588,6 +629,7 @@ namespace ShieldyCSharpExample
             }
 
             var result = Bindings.SC_DownloadFile(name, out var buf, out var size);
+            _currDlFile = "";
             if (result)
             {
                 var data = new byte[size];
